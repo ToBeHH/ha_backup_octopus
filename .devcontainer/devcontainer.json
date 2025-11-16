@@ -1,0 +1,16 @@
+{
+  "name": "Home Assistant Dev",
+  "image": "ghcr.io/home-assistant/devcontainer:supervisor",
+  "postCreateCommand": "scripts/install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/custom_components,target=/workspaces/custom_components,type=bind,consistency=cached"
+  ]
+}
