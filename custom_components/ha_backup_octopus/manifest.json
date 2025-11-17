@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "documentation": "https://github.com/ToBeHH/ha_backup_octopus",
   "requirements": [
-    "aiofiles"
+    "aiofiles",
+    "aiohttp"
   ],
   "codeowners": [
     "@ToBeHH"
