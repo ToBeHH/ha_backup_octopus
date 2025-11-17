@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install HACS into the Home Assistant config directory inside the devcontainer.
+# Behaviour:
+# 1) Try the official installer (curl|wget | bash)
+# 2) If that fails (common in devcontainers where HA isn't running yet), attempt a fallback
+#    - clone https://github.com/hacs/integration into config/custom_components/hacs (via git)
+#    - if git not available, download ZIP and extract
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$WORKSPACE_ROOT"
+
+echo "[install-hacs] Starting HACS installation in $WORKSPACE_ROOT/config"
+
+if [ -f .venv/bin/activate ]; then
+  # shellcheck source=/dev/null
+  . .venv/bin/activate
+  echo "[install-hacs] Activated .venv"
+fi
+
+mkdir -p config
+cd config
+
+echo "[install-hacs] Downloading and running HACS installer (official script)"
+INSTALL_OK=0
+if command -v curl >/dev/null 2>&1; then
+  if curl -fsSL https://get.hacs.xyz | bash -; then
+    INSTALL_OK=1
+  else
+    INSTALL_OK=0
+  fi
+else
+  echo "[install-hacs] curl not found. Trying wget..."
+  if command -v wget >/dev/null 2>&1; then
+    if wget -qO- https://get.hacs.xyz | bash -; then
+      INSTALL_OK=1
+    else
+      INSTALL_OK=0
+    fi
+  else
+    echo "[install-hacs] Neither curl nor wget found — will try fallback installation." >&2
+    INSTALL_OK=0
+  fi
+fi
+
+if [ "$INSTALL_OK" -eq 1 ]; then
+  echo "[install-hacs] Official HACS installer finished successfully."
+  echo "[install-hacs] Please restart Home Assistant after the container build completes."
+  exit 0
+fi
+
+echo "[install-hacs] Official installer failed or was not usable. Attempting fallback: clone HACS integration into config/custom_components/hacs"
+mkdir -p custom_components
+if [ -d custom_components/hacs ]; then
+  echo "[install-hacs] custom_components/hacs already exists — skipping clone."
+  exit 0
+fi
+
+if command -v git >/dev/null 2>&1; then
+  echo "[install-hacs] Cloning HACS integration via git..."
+  if git clone --depth 1 https://github.com/hacs/integration.git custom_components/hacs; then
+    # remove .git to keep the copy clean
+    rm -rf custom_components/hacs/.git || true
+    echo "[install-hacs] Cloned HACS to custom_components/hacs."
+    echo "[install-hacs] Note: you may still need to install frontend assets or complete setup in the HA UI and restart Home Assistant."
+    exit 0
+  else
+    echo "[install-hacs] git clone failed." >&2
+  fi
+fi
+
+echo "[install-hacs] git not available or clone failed. Trying to download ZIP of HACS integration..."
+TMPZIP="/tmp/hacs_integration.zip"
+URL="https://github.com/hacs/integration/archive/refs/heads/main.zip"
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$URL" -o "$TMPZIP" || true
+elif command -v wget >/dev/null 2>&1; then
+  wget -qO "$TMPZIP" "$URL" || true
+fi
+
+if [ -f "$TMPZIP" ]; then
+  mkdir -p /tmp/hacs_unpack
+  if unzip -q "$TMPZIP" -d /tmp/hacs_unpack; then
+    EXTRACT_DIR=$(find /tmp/hacs_unpack -maxdepth 1 -type d -name 'integration*' | head -n1)
+    if [ -n "$EXTRACT_DIR" ]; then
+      mkdir -p custom_components/hacs
+      mv "$EXTRACT_DIR"/* custom_components/hacs/ 2>/dev/null || true
+      rm -rf /tmp/hacs_unpack "$TMPZIP" || true
+      echo "[install-hacs] Extracted HACS integration to custom_components/hacs."
+      echo "[install-hacs] Note: you may still need to install frontend assets or complete setup in the HA UI and restart Home Assistant."
+      exit 0
+    fi
+  fi
+fi
+
+echo "[install-hacs] Fallback installation failed: could not install HACS."
+echo "[install-hacs] You can try to run the official installer manually inside the running Home Assistant config directory:" >&2
+echo "  cd config && curl -fsSL https://get.hacs.xyz | bash -" >&2
+exit 1

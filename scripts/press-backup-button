@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# make script executable when applied in repo
+umask 022
+
+# Ensure script is executable (git may not preserve exec bit in some setups)
+chmod +x "$0" >/dev/null 2>&1 || true
+
+# Press the HA Backup Octopus button via Home Assistant REST API.
+# Usage:
+#   HASS_TOKEN=your_token ./scripts/press-backup-button
+# Optional: set HASS_URL (default http://localhost:8123)
+
+HASS_URL="${HASS_URL:-http://localhost:8123}"
+ENTITY_ID="button.ha_backup_octopus_backup_now"
+
+# Optionally load variables from a .env file in the repo root. The script
+# will only import HASS_TOKEN and HASS_URL keys to avoid accidentally
+# exporting unrelated variables.
+ENV_FILE="${ENV_FILE:-.env}"
+if [ -f "$ENV_FILE" ]; then
+  echo "Loading environment variables from $ENV_FILE"
+  # Read file line by line and parse KEY=VALUE pairs. Ignore comments and blank lines.
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Trim leading/trailing whitespace
+    line="$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [ -z "$line" ] && continue
+    case "$line" in
+      \#*) continue ;; # comment
+    esac
+    if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      key="${BASH_REMATCH[1]}"
+      val="${BASH_REMATCH[2]}"
+      # strip surrounding quotes if present
+      val="${val%\"}"
+      val="${val#\"}"
+      val="${val%\'}"
+      val="${val#\'}"
+      case "$key" in
+        HASS_TOKEN)
+          export HASS_TOKEN="$val" ;;
+        HASS_URL)
+          export HASS_URL="$val" ;;
+      esac
+    fi
+  done < "$ENV_FILE"
+fi
+
+TOKEN="${HASS_TOKEN:-}"
+
+if [ -z "$TOKEN" ]; then
+  echo "No HASS_TOKEN provided. Create a Long-Lived Access Token in Home Assistant (Profile -> Long-Lived Access Tokens)"
+  echo "Then run: HASS_TOKEN=<token> HASS_URL=$HASS_URL $0"
+  echo
+  echo "If you prefer to run the request inside the HA container, you can run:"
+  echo "  docker exec -it homeassistant-dev bash -c 'curl -X POST -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d \"{\"entity_id\":\"${ENTITY_ID}\"}\" http://localhost:8123/api/services/button/press'"
+  exit 2
+fi
+
+echo "Calling Home Assistant at $HASS_URL to press $ENTITY_ID"
+RESP=$(curl -s -w "%{http_code}" -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"entity_id\": \"${ENTITY_ID}\"}" \
+  "$HASS_URL/api/services/button/press")
+
+if [ "$RESP" = "200" ] || [ "$RESP" = "201" ] || [ "$RESP" = "204" ]; then
+  echo "OK: Service call succeeded (HTTP $RESP)"
+  exit 0
+else
+  echo "Service call returned HTTP $RESP" >&2
+  exit 1
+fi

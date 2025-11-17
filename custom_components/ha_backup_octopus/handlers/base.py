@@ -1,4 +1,8 @@
 import os
+import logging
+from functools import partial
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class DeviceBackupHandler:
@@ -24,11 +28,20 @@ class DeviceBackupHandler:
                     os.path.join("backups", self.device_name), self.device_id
                 )
 
-        os.makedirs(self.backup_folder, exist_ok=True)
+        # Create folder in executor to avoid blocking the event loop
+        try:
+            await self.hass.async_add_executor_job(partial(os.makedirs, self.backup_folder, exist_ok=True))
+        except Exception:
+            # fallback: try synchronous make (should be rare)
+            try:
+                os.makedirs(self.backup_folder, exist_ok=True)
+            except Exception:
+                _LOGGER.exception(
+                    "Could not create backup folder: %s", self.backup_folder)
 
         try:
             await self.fetch_backup(self.backup_folder)
             return True
-        except Exception as e:
-            print(f"Error during backup of {self.device_name}: {e}")
+        except Exception:
+            _LOGGER.exception("Error during backup of %s", self.device_name)
             return False

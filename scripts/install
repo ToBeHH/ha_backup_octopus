@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Simple install helper for the devcontainer environment.
+# - creates a virtualenv at `.venv` if missing
+# - upgrades pip/setuptools/wheel
+# - installs top-level `requirements.txt` if present
+# - installs component-level requirements if present
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$WORKSPACE_ROOT"
+
+echo "[install] Starting install in $WORKSPACE_ROOT"
+
+if command -v python3 >/dev/null 2>&1; then
+  PY=python3
+elif command -v python >/dev/null 2>&1; then
+  PY=python
+else
+  echo "[install] No Python interpreter found; skipping python setup." >&2
+  exit 0
+fi
+
+if [ ! -d ".venv" ]; then
+  echo "[install] Creating virtual environment (.venv) using $PY"
+  $PY -m venv .venv
+fi
+
+if [ -f ".venv/bin/activate" ]; then
+  # shellcheck source=/dev/null
+  . .venv/bin/activate
+fi
+
+echo "[install] Upgrading pip, setuptools, wheel"
+pip install --upgrade pip setuptools wheel
+
+if [ -f "requirements.txt" ]; then
+  echo "[install] Installing from requirements.txt"
+  pip install -r requirements.txt
+fi
+
+if [ -d "custom_components/ha_backup_octopus" ] && [ -f "custom_components/ha_backup_octopus/requirements.txt" ]; then
+  echo "[install] Installing component requirements"
+  pip install -r custom_components/ha_backup_octopus/requirements.txt
+fi
+
+echo "[install] Done. Activate the venv with: source .venv/bin/activate"
+
+exit 0

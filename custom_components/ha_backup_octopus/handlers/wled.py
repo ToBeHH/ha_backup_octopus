@@ -1,4 +1,5 @@
 import aiohttp
+import aiofiles
 from .base import DeviceBackupHandler
 
 
@@ -16,8 +17,8 @@ class WLEDBackupHandler(DeviceBackupHandler):
             async with session.get(presets_url) as resp:
                 presets_data: bytes = await resp.read()
 
-        # save both files to disk
-        with open(f"{folder}/cfg.json", "wb") as f:
-            f.write(cfg_data)
-        with open(f"{folder}/presets.json", "wb") as f:
-            f.write(presets_data)
+        # save both files to disk asynchronously
+        async with aiofiles.open(f"{folder}/cfg.json", "wb") as f:
+            await f.write(cfg_data)
+        async with aiofiles.open(f"{folder}/presets.json", "wb") as f:
+            await f.write(presets_data)

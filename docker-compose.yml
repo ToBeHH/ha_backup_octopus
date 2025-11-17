@@ -1,0 +1,17 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant-dev
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+      - ./custom_components:/config/custom_components:rw
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=Europe/Berlin
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8123 || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 5

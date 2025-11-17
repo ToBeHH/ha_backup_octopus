@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Development helper: activate venv (if present) and run pytest
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$WORKSPACE_ROOT"
+
+if [ -f .venv/bin/activate ]; then
+	# shellcheck source=/dev/null
+	. .venv/bin/activate
+fi
+
+if command -v pytest >/dev/null 2>&1; then
+	pytest -q "$@"
+else
+	echo "pytest not found. Run 'bash scripts/install' to set up the environment." >&2
+	exit 1
+fi

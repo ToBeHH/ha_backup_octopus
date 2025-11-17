@@ -1,7 +1,10 @@
 {
   "name": "Home Assistant Dev",
-  "image": "ghcr.io/home-assistant/devcontainer:supervisor",
-  "postCreateCommand": "scripts/install",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "postCreateCommand": "bash -lc 'chmod +x scripts/* || true && bash scripts/install && bash scripts/install-hacs'",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -11,6 +14,12 @@
     }
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/custom_components,target=/workspaces/custom_components,type=bind,consistency=cached"
-  ]
+    "source=${localWorkspaceFolder}/custom_components,target=/workspaces/custom_components,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/config,target=/config,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/custom_components,target=/config/custom_components,type=bind,consistency=cached"
+  ],
+  "forwardPorts": [
+    8123
+  ],
+  "workspaceFolder": "/workspaces/ha_backup_octopus"
 }
