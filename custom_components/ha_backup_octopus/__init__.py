@@ -72,4 +72,74 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     hass.async_create_task(_delayed_load())
 
+    # Note: we rely on `async_load_platform` to create the `button` entity.
+    # Previously a direct fallback added the entity programmatically; that
+    # approach has been removed in favor of a single discovery path to
+    # keep startup behavior predictable.
+
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
+    """Set up from a config entry (UI flow).
+
+    Create the integration runtime (delegates to `async_setup` when the
+    integration is not already initialized). This keeps behavior the
+    same whether the integration is added via YAML or the UI.
+    """
+    if hass.data.get(DOMAIN) is None:
+        # Reuse async_setup logic to initialize manager, services and
+        # discovery tasks. Pass an empty config dict because config
+        # entries carry no extra YAML config for this integration.
+        await async_setup(hass, {})
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
+    """Unload a config entry and clean up resources.
+
+    This will unload the button platform we created and remove the
+    integration data and service registration.
+    """
+    # Attempt to unload the platform (button)
+    try:
+        from homeassistant.helpers import discovery as _discovery
+
+        unloaded = await _discovery.async_unload_platform(hass, "button", DOMAIN, entry)
+        _LOGGER.debug("Platform unload result: %s", unloaded)
+    except Exception:
+        # Some HA versions may not support async_unload_platform; try
+        # the component unload path instead.
+        try:
+            from homeassistant.helpers import entity_platform as _entity_platform
+
+            platform = _entity_platform.async_get_platform(
+                hass, "button", DOMAIN)
+            if platform is not None:
+                await platform.async_remove_entities([])
+        except Exception:
+            _LOGGER.debug("Could not use platform-specific unload; continuing")
+
+    # Remove service if registered
+    try:
+        hass.services.async_remove(DOMAIN, "run_backups")
+    except Exception:
+        pass
+
+    # Clean up stored data
+    if DOMAIN in hass.data:
+        try:
+            manager = hass.data.get(DOMAIN)
+            if manager is not None:
+                try:
+                    await manager.shutdown()
+                except Exception:
+                    _LOGGER.exception(
+                        "Error during manager.shutdown() for %s", DOMAIN)
+
+            del hass.data[DOMAIN]
+        except Exception:
+            _LOGGER.exception("Failed to clear hass.data for %s", DOMAIN)
+
     return True

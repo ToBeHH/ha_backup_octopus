@@ -3,6 +3,14 @@ import logging
 import json
 from functools import partial
 
+import aiohttp
+
+# prefer Home Assistant's shared client session when available
+try:
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+except Exception:  # pragma: no cover - only available inside Home Assistant
+    async_get_clientsession = None
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -110,3 +118,16 @@ class DeviceBackupHandler:
         except Exception:
             _LOGGER.exception("Error during backup of %s", self.device_name)
             return False
+
+    async def get_clientsession(self):
+        """Return an aiohttp client session and a close_after flag.
+
+        When running inside Home Assistant, prefer its shared session
+        (returned with close_after=False). Outside HA, create a
+        temporary `aiohttp.ClientSession()` and return close_after=True
+        so callers know to close it.
+        """
+        if async_get_clientsession is not None and getattr(self, "hass", None) is not None:
+            return async_get_clientsession(self.hass), False
+        # Outside HA: create a temporary session the caller should close
+        return aiohttp.ClientSession(), True

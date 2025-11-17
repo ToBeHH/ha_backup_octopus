@@ -62,6 +62,10 @@ class BackupNowButton(ButtonEntity):
     def should_poll(self) -> bool:
         return False
 
+    @property
+    def icon(self):
+        return "mdi:backup-restore"
+
     async def async_press(self) -> None:
         """Handle the button press by running backups."""
         # run_backups is an async method

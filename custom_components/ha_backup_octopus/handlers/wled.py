@@ -41,17 +41,27 @@ class WLEDBackupHandler(DeviceBackupHandler):
         super().__init__(hass, device_name, ip_address, entry=entry)
 
     async def fetch_backup(self, folder) -> None:
-        async with aiohttp.ClientSession() as session:
-            cfg_url: str = f"http://{self.device_id}/cfg.json"
-            presets_url: str = f"http://{self.device_id}/presets.json"
+        # Use centralized helper from base class to obtain a session.
+        session, close_after = await self.get_clientsession()
 
-            async with session.get(cfg_url) as resp:
-                cfg_data: bytes = await resp.read()
-            async with session.get(presets_url) as resp:
-                presets_data: bytes = await resp.read()
+        cfg_url: str = f"http://{self.device_id}/cfg.json"
+        presets_url: str = f"http://{self.device_id}/presets.json"
+
+        async with session.get(cfg_url) as resp:
+            cfg_data: bytes = await resp.read()
+        async with session.get(presets_url) as resp:
+            presets_data: bytes = await resp.read()
 
         # save both files to disk asynchronously
         async with aiofiles.open(f"{folder}/cfg.json", "wb") as f:
             await f.write(cfg_data)
         async with aiofiles.open(f"{folder}/presets.json", "wb") as f:
             await f.write(presets_data)
+
+        # Close the temporary session if we created one.
+        if close_after:
+            try:
+                await session.close()
+            except Exception:
+                # Best-effort close; do not fail backup for cleanup issues
+                pass

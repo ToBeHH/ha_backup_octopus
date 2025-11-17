@@ -31,3 +31,29 @@ class BackupManager:
             except Exception as exc:  # pragma: no cover - defensive
                 _LOGGER.exception("Exception during backup for %s: %s", getattr(
                     handler, "device_name", "<unknown>"), exc)
+
+    async def shutdown(self) -> None:
+        """Shutdown the manager and its handlers.
+
+        If handlers implement an async `shutdown()` method it will be
+        awaited; if they implement a synchronous `shutdown()` it will
+        be called in the executor. Finally the handler list is cleared.
+        """
+        for handler in list(self.device_handlers):
+            try:
+                # prefer async shutdown
+                shutdown = getattr(handler, "shutdown", None)
+                if shutdown is None:
+                    continue
+
+                if asyncio.iscoroutinefunction(shutdown):
+                    await shutdown()
+                else:
+                    # run sync shutdown in executor
+                    await self.hass.async_add_executor_job(shutdown)
+            except Exception:
+                _LOGGER.exception("Error shutting down handler %s", getattr(
+                    handler, "device_name", handler))
+
+        # remove handlers list
+        self.device_handlers.clear()
