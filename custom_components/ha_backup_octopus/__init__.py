@@ -1,4 +1,4 @@
-from .handlers.wled import WLEDBackupHandler
+from .handlers import AVAILABLE_HANDLERS
 from .backup_manager import BackupManager
 from homeassistant.core import HomeAssistant
 import logging
@@ -26,48 +26,33 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.services.async_register(
         DOMAIN, "run_backups", lambda call: hass.async_create_task(_run_backups_service(call)))
 
-    # Discover WLED devices from existing WLED config entries.
-    async def _discover_wled_devices() -> None:
-        entries = hass.config_entries.async_entries("wled")
-        for entry in entries:
-            name = entry.title or f"wled-{entry.entry_id}"
-            # Common keys used by WLED config entries
-            host = entry.data.get("host") or entry.data.get(
-                "ip_address") or entry.data.get("host_ip") or entry.data.get("host_name")
-            if not host:
-                # Try to find a device in the device registry attached to this config entry
+    # Discover handlers by asking each available handler class to find
+    # matching config entries and return handler instances. This keeps
+    # integration-level code generic and moves provider-specific logic
+    # into the handler classes.
+    async def _discover_handlers() -> None:
+        for handler_cls in AVAILABLE_HANDLERS:
+            try:
+                entries = handler_cls.find_entries(hass)
+            except Exception:
+                _LOGGER.exception(
+                    "Error while finding entries for %s", handler_cls)
+                entries = []
+
+            for entry in entries:
                 try:
-                    from homeassistant.helpers import device_registry as dr
-
-                    registry = dr.async_get(hass)
-                    for dev in registry.devices.values():
-                        if entry.entry_id in dev.config_entries:
-                            name = dev.name or name
-                            if dev.configuration_url and isinstance(dev.configuration_url, str):
-                                try:
-                                    import urllib.parse as _up
-
-                                    parsed = _up.urlparse(
-                                        dev.configuration_url)
-                                    if parsed.hostname:
-                                        host = parsed.hostname
-                                except Exception:
-                                    pass
-                            break
+                    created = handler_cls.create_handlers_from_entry(
+                        hass, entry)
+                    for h in created:
+                        manager.register_handler(h)
                 except Exception:
-                    pass
+                    _LOGGER.exception(
+                        "Failed to create handler(s) from entry %s for %s",
+                        getattr(entry, "entry_id", entry),
+                        handler_cls,
+                    )
 
-            if not host:
-                hass.logger.warning(
-                    "WLED config entry %s has no host info; handler not registered",
-                    entry.entry_id,
-                )
-                continue
-
-            handler = WLEDBackupHandler(hass, name, host)
-            manager.register_handler(handler)
-
-    hass.async_create_task(_discover_wled_devices())
+    hass.async_create_task(_discover_handlers())
 
     # Ensure the custom button platform is loaded programmatically so the
     # UI button entity is created without requiring YAML configuration.
