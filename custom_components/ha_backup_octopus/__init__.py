@@ -25,7 +25,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         await manager.run_backups()
 
     hass.services.async_register(
-        DOMAIN, "run_backups", lambda call: hass.async_create_task(_run_backups_service(call)))
+        DOMAIN,
+        "run_backups",
+        lambda call: hass.async_create_task(_run_backups_service(call)),
+    )
 
     # Discover handlers by asking each available handler class to find
     # matching config entries and return handler instances. This keeps
@@ -36,14 +39,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             try:
                 entries = handler_cls.find_entries(hass)
             except Exception:
-                _LOGGER.exception(
-                    "Error while finding entries for %s", handler_cls)
+                _LOGGER.exception("Error while finding entries for %s", handler_cls)
                 entries = []
 
             for entry in entries:
                 try:
-                    created = handler_cls.create_handlers_from_entry(
-                        hass, entry)
+                    created = handler_cls.create_handlers_from_entry(hass, entry)
                     for h in created:
                         manager.register_handler(h)
                 except Exception:
@@ -54,14 +55,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     )
 
     hass.async_create_task(_discover_handlers())
-
-    # Mark manager ready only after Home Assistant startup completes to avoid
-    # triggering backups during initial setup.
-    @callback
-    def _mark_ready(_event):
-        manager.mark_ready()
-
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _mark_ready)
 
     # Ensure the custom button platform is loaded programmatically so the
     # UI button entity is created without requiring YAML configuration.
@@ -76,8 +69,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             await _discovery.async_load_platform(hass, "button", DOMAIN, {}, config)
             _LOGGER.info("Requested button platform load for %s", DOMAIN)
         except Exception:
-            hass.logger.exception(
-                "Failed to load button platform for %s", DOMAIN)
+            hass.logger.exception("Failed to load button platform for %s", DOMAIN)
 
     hass.async_create_task(_delayed_load())
 
@@ -123,8 +115,7 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
         try:
             from homeassistant.helpers import entity_platform as _entity_platform
 
-            platform = _entity_platform.async_get_platform(
-                hass, "button", DOMAIN)
+            platform = _entity_platform.async_get_platform(hass, "button", DOMAIN)
             if platform is not None:
                 await platform.async_remove_entities([])
         except Exception:
@@ -144,8 +135,7 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
                 try:
                     await manager.shutdown()
                 except Exception:
-                    _LOGGER.exception(
-                        "Error during manager.shutdown() for %s", DOMAIN)
+                    _LOGGER.exception("Error during manager.shutdown() for %s", DOMAIN)
 
             del hass.data[DOMAIN]
         except Exception:
