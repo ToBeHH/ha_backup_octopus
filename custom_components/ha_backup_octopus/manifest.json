@@ -2,12 +2,16 @@
   "domain": "ha_backup_octopus",
   "name": "Home Assistant Backup Octopus",
   "documentation": "https://github.com/ToBeHH/ha_backup_octopus",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/ToBeHH/ha_backup_octopus/issues",
   "requirements": [
-    "aiofiles",
-    "aiohttp"
+    "aiofiles==23.2.1",
+    "aiohttp==3.9.5"
   ],
   "config_flow": true,
   "codeowners": [
     "@ToBeHH"
-  ]
+  ],
+  "version": "0.0.1"
 }
