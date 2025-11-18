@@ -1,7 +1,8 @@
 from .handlers import AVAILABLE_HANDLERS
 from .backup_manager import BackupManager
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 import logging
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +54,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     )
 
     hass.async_create_task(_discover_handlers())
+
+    # Mark manager ready only after Home Assistant startup completes to avoid
+    # triggering backups during initial setup.
+    @callback
+    def _mark_ready(_event):
+        manager.mark_ready()
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _mark_ready)
 
     # Ensure the custom button platform is loaded programmatically so the
     # UI button entity is created without requiring YAML configuration.

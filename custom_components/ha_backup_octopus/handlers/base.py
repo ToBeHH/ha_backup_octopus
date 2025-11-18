@@ -27,6 +27,12 @@ class DeviceBackupHandler:
         """Return backup data as dictionary."""
         raise NotImplementedError
 
+    async def is_online(self) -> bool:
+        """Return True if the device appears reachable.
+
+        Default implementation always returns True; handlers can override.
+        """
+        return True
     @classmethod
     def config_entry_domain(cls) -> str | None:
         """Return the config entry domain this handler understands.
@@ -111,6 +117,19 @@ class DeviceBackupHandler:
                         "Failed to write entry.json for %s", self.device_name)
 
             await self.hass.async_add_executor_job(_write_entry_file)
+
+        try:
+            online = await self.is_online()
+        except Exception:
+            _LOGGER.exception("Online check failed for %s", self.device_name)
+            online = False
+
+        if not online:
+            _LOGGER.warning(
+                "Skipping backup for %s because the device is offline",
+                self.device_name,
+            )
+            return False
 
         try:
             await self.fetch_backup(self.backup_folder)

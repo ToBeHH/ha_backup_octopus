@@ -8,9 +8,14 @@ class BackupManager:
     def __init__(self, hass) -> None:
         self.hass = hass
         self.device_handlers = []
+        self.ready = False
 
     def register_handler(self, handler) -> None:
         self.device_handlers.append(handler)
+
+    def mark_ready(self) -> None:
+        """Allow backups to run after Home Assistant finished starting."""
+        self.ready = True
 
     async def run_backups(self) -> None:
         """Run backups for all registered handlers.
@@ -19,6 +24,10 @@ class BackupManager:
         backup folder and then invokes the implementation-specific
         `fetch_backup(folder)` method.
         """
+        if not self.ready:
+            _LOGGER.info("Backup request ignored: Home Assistant startup not finished yet")
+            return
+
         for handler in self.device_handlers:
             try:
                 ok = await handler.run_backup()

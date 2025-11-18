@@ -40,6 +40,24 @@ class WLEDBackupHandler(DeviceBackupHandler):
     def __init__(self, hass, device_name, ip_address, entry=None) -> None:
         super().__init__(hass, device_name, ip_address, entry=entry)
 
+    async def is_online(self) -> bool:
+        """Check if the WLED device responds to a quick info request."""
+        session, close_after = await self.get_clientsession()
+        try:
+            # Small timeout to avoid hanging startup; cache hit if WLED is up.
+            timeout = aiohttp.ClientTimeout(total=3)
+            info_url = f"http://{self.device_id}/json/info"
+            async with session.get(info_url, timeout=timeout) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+        finally:
+            if close_after:
+                try:
+                    await session.close()
+                except Exception:
+                    pass
+
     async def fetch_backup(self, folder) -> None:
         # Use centralized helper from base class to obtain a session.
         session, close_after = await self.get_clientsession()
