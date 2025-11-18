@@ -1,7 +1,6 @@
 {
   "domain": "ha_backup_octopus",
   "name": "Home Assistant Backup Octopus",
-  "version": "0.0.1",
   "documentation": "https://github.com/ToBeHH/ha_backup_octopus",
   "requirements": [
     "aiofiles",
