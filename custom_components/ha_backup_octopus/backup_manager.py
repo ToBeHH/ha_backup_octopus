@@ -8,14 +8,9 @@ class BackupManager:
     def __init__(self, hass) -> None:
         self.hass = hass
         self.device_handlers = []
-        self.ready = False
 
     def register_handler(self, handler) -> None:
         self.device_handlers.append(handler)
-
-    def mark_ready(self) -> None:
-        """Allow backups to run after Home Assistant finished starting."""
-        self.ready = True
 
     async def run_backups(self) -> None:
         """Run backups for all registered handlers.
@@ -24,22 +19,25 @@ class BackupManager:
         backup folder and then invokes the implementation-specific
         `fetch_backup(folder)` method.
         """
-        if not self.ready:
-            _LOGGER.info("Backup request ignored: Home Assistant startup not finished yet")
-            return
-
         for handler in self.device_handlers:
             try:
                 ok = await handler.run_backup()
                 if ok:
-                    _LOGGER.info("Backup successful for %s", getattr(
-                        handler, "device_name", "<unknown>"))
+                    _LOGGER.info(
+                        "Backup successful for %s",
+                        getattr(handler, "device_name", "<unknown>"),
+                    )
                 else:
-                    _LOGGER.warning("Backup failed for %s", getattr(
-                        handler, "device_name", "<unknown>"))
+                    _LOGGER.warning(
+                        "Backup failed for %s",
+                        getattr(handler, "device_name", "<unknown>"),
+                    )
             except Exception as exc:  # pragma: no cover - defensive
-                _LOGGER.exception("Exception during backup for %s: %s", getattr(
-                    handler, "device_name", "<unknown>"), exc)
+                _LOGGER.exception(
+                    "Exception during backup for %s: %s",
+                    getattr(handler, "device_name", "<unknown>"),
+                    exc,
+                )
 
     async def shutdown(self) -> None:
         """Shutdown the manager and its handlers.
@@ -61,8 +59,10 @@ class BackupManager:
                     # run sync shutdown in executor
                     await self.hass.async_add_executor_job(shutdown)
             except Exception:
-                _LOGGER.exception("Error shutting down handler %s", getattr(
-                    handler, "device_name", handler))
+                _LOGGER.exception(
+                    "Error shutting down handler %s",
+                    getattr(handler, "device_name", handler),
+                )
 
         # remove handlers list
         self.device_handlers.clear()
