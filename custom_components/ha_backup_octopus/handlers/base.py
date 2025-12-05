@@ -67,6 +67,7 @@ class DeviceBackupHandler:
         return []
 
     async def run_backup(self) -> None:
+        _LOGGER.info("Starting backup for %s", getattr(self, "device_name", "<unknown>"))
         # Determine backup folder
         if self.backup_folder is None:
             if self.hass:
